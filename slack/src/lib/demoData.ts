@@ -204,8 +204,8 @@ export const seedMessages: Message[] = [
     time: '9:04 AM',
     kind: 'report',
     body:
-      'PR #42 peeled into 5 layers: performance optimization released, pricing waiting for finance/product, provider switch waiting for platform/security, ANN threshold needs eval, and integration test deletion blocked.',
-    tags: ['PR #42', 'authority report'],
+      'Ready for a Fast Tax demo. Type "@CodeOnion drop the Pro Monthly price to $15 for launch" to open the pricing authority flow.',
+    tags: ['ready', 'Fast Tax'],
     reactions: [{ emoji: 'OK', count: 4 }]
   },
   {
@@ -216,7 +216,7 @@ export const seedMessages: Message[] = [
     avatar: 'MC',
     time: '9:06 AM',
     body:
-      'The copy cleanup can go with the safe PR. Keep the Deluxe price change separate so Finance can review revenue impact before it gets a merge token.',
+      'Product can approve the launch promo after Code Onion records the demo approval receipt and keeps the change isolated in the pricing PR.',
     reactions: [{ emoji: 'thread', count: 2 }]
   },
   {
@@ -227,7 +227,7 @@ export const seedMessages: Message[] = [
     avatar: 'OR',
     time: '9:08 AM',
     body:
-      'For pricing: I need the promo calendar and refund exposure. A one-line JSON diff still changes booked revenue.',
+      'For pricing: I need the promo calendar and refund exposure before the pricing merge credential is released.',
     tags: ['money.pricing']
   },
   {
@@ -239,7 +239,7 @@ export const seedMessages: Message[] = [
     time: '9:11 AM',
     kind: 'approval',
     body:
-      'The deleted paid-customer assertion is a hard block. Agents can add coverage, but they cannot weaken the filing test oracle to make CI green.',
+      'Reminder for the demo: deleting or weakening integration tests is still blocked. Agents can add coverage, but they cannot weaken the filing test oracle.',
     tags: ['blocked', 'test_oracle.integration']
   },
   {
@@ -326,7 +326,7 @@ export const seedMessages: Message[] = [
     avatar: 'NS',
     time: '12:36 PM',
     body:
-      'Once safe PR #42A lands, we can deploy to staging with the low-risk credential. Blocked and waiting layers stay parked.'
+      'Once a safe implementation PR lands, we can deploy to staging with the low-risk credential. Blocked and waiting layers stay parked.'
   },
   {
     id: 13,

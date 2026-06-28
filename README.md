@@ -12,6 +12,8 @@ The demo company is **Fast Tax**, a fictional tax-prep repo:
 
 [github.com/yavol/fast-tax](https://github.com/yavol/fast-tax)
 
+Demo PR: [yavol/fast-tax#1](https://github.com/yavol/fast-tax/pull/1)
+
 Fast Tax is where the coding agent makes product changes. Code Onion is the policy and approval layer watching those changes.
 
 Fast Tax contains demo authority zones for:

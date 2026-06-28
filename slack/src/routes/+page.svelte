@@ -26,8 +26,11 @@
   let composer = '';
   let composerEl: HTMLTextAreaElement;
   let messagesEl: HTMLDivElement;
-  let messages: Message[] = seedMessages;
+  let messages: Message[] = [...seedMessages];
   const demoPrompt = '@CodeOnion drop the Pro Monthly price to $15 for launch';
+  const pricingPrNumber = 1;
+  const pricingRepo = 'yavol/fast-tax';
+  const pricingPrUrl = `https://github.com/${pricingRepo}/pull/${pricingPrNumber}`;
   let botStatus = '';
   let demoRunId = 0;
   let pricingDemo = {
@@ -140,9 +143,9 @@
         role: 'Coding agent',
         avatar: 'CO',
         body:
-          'Working in Fast Tax... changed src/prices/prices.json: pro_monthly priceCents 2900 -> 1500. Opened draft PR #42: Launch promo pricing.',
+          `Working in Fast Tax... changed src/prices/prices.json: pro_monthly priceCents 2900 -> 1500. Opened PR #${pricingPrNumber}: Launch promo pricing.`,
         kind: 'agent',
-        tags: ['Fast Tax', 'draft PR #42']
+        tags: ['Fast Tax', `${pricingRepo}#${pricingPrNumber}`]
       },
       {
         channelId: 'agent-approvals',
@@ -159,11 +162,14 @@
     );
   }
 
-  async function releaseCapability(capability: string) {
+  async function releaseCapability(
+    capability: string,
+    options: { prNumber?: number; targetRepo?: string } = {}
+  ) {
     const response = await fetch('/api/capability/release', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ capability })
+      body: JSON.stringify({ capability, ...options })
     });
     const receipt = await response.json();
 
@@ -242,7 +248,7 @@
           role: 'CI runner',
           avatar: 'CO',
           body:
-            'pricing_contract_tests and checkout_integration_tests passed for PR #42. Pricing policy is now satisfied.',
+            `pricing_contract_tests and checkout_integration_tests passed for PR #${pricingPrNumber}. Pricing policy is now satisfied.`,
           kind: 'agent',
           tags: ['checks passed']
         }
@@ -266,7 +272,7 @@
             author: 'Code Onion Agent',
             role: '1Password capability gate',
             avatar: 'CO',
-            body: `1Password released merge credential ${receipt.capability} for one subprocess. Secret exposed to model: ${receipt.secretExposedToModel}. TTL: ${receipt.ttlSeconds}s. PR #42 can merge through the controlled command path.`,
+            body: `1Password released merge credential ${receipt.capability} for one approved subprocess. Secret exposed to model: ${receipt.secretExposedToModel}. TTL: ${receipt.ttlSeconds}s. ${pricingRepo}#${pricingPrNumber} is ready for the controlled merge path.`,
             kind: 'report',
             tags: ['1Password receipt', 'merge credential released']
           }
@@ -486,15 +492,16 @@
       <section class="demo-card" aria-label="Pricing authority workflow">
         <div>
           <p class="eyebrow">Live demo</p>
-          <h3>PR #42: Pro Monthly launch promo</h3>
+          <div class="demo-heading">
+            <h3>Fast Tax PR #{pricingPrNumber}: Pro Monthly launch promo</h3>
+            <a class="pr-link" href={pricingPrUrl} target="_blank" rel="noreferrer">
+              {pricingRepo}#{pricingPrNumber}
+            </a>
+          </div>
           <p>
             `src/prices/prices.json` changed `pro_monthly` from 2900 to 1500 cents. Demo approval
             receipts are recorded before stakeholder approval; the merge credential stays withheld
             until policy passes.
-          </p>
-          <p class="demo-note">
-            Hackathon mode: stakeholder identity is simulated in the UI; approval receipts and merge
-            credentials are backed by 1Password.
           </p>
         </div>
 
@@ -1167,10 +1174,30 @@
   }
 
   .demo-card h3 {
-    margin: 0 0 4px;
+    margin: 0;
     color: #201c13;
     font-size: 1rem;
     line-height: 1.15;
+  }
+
+  .demo-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .pr-link {
+    color: #244c3b;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .demo-card p {
@@ -1182,13 +1209,6 @@
       sans-serif;
     font-size: 0.88rem;
     line-height: 1.35;
-  }
-
-  .demo-card .demo-note {
-    margin-top: 8px;
-    color: #7d5a25;
-    font-size: 0.78rem;
-    font-weight: 800;
   }
 
   .demo-steps {
