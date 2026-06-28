@@ -4,8 +4,10 @@
     Bell,
     ChevronDown,
     Circle,
+    Check,
     FileDiff,
     Hash,
+    KeyRound,
     LayoutDashboard,
     LockKeyhole,
     MoreHorizontal,
@@ -23,6 +25,15 @@
   let composer = '';
   let composerEl: HTMLTextAreaElement;
   let messages: Message[] = seedMessages;
+  let pricingDemo = {
+    active: false,
+    productApproved: false,
+    financeApproved: false,
+    checksPassed: false,
+    released: false,
+    releasePending: false,
+    releaseError: ''
+  };
 
   $: selectedChannel = channels.find((channel) => channel.id === selectedChannelId) ?? channels[0];
   $: selectedPersona = personas.find((persona) => persona.id === selectedPersonaId) ?? personas[0];
@@ -31,24 +42,170 @@
     `${channel.name} ${channel.topic} ${channel.layer}`.toLowerCase().includes(searchText.toLowerCase())
   );
 
+  function nowLabel() {
+    return new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit'
+    }).format(new Date());
+  }
+
+  function nextMessageId() {
+    return Math.max(0, ...messages.map((message) => message.id)) + 1;
+  }
+
+  function appendMessages(newMessages: Omit<Message, 'id' | 'time'>[]) {
+    let nextId = nextMessageId();
+    const time = nowLabel();
+    messages = [
+      ...messages,
+      ...newMessages.map((message) => ({
+        ...message,
+        id: nextId++,
+        time
+      }))
+    ];
+  }
+
+  function startPricingDemo() {
+    pricingDemo = {
+      active: true,
+      productApproved: false,
+      financeApproved: false,
+      checksPassed: false,
+      released: false,
+      releasePending: false,
+      releaseError: ''
+    };
+
+    selectedChannelId = 'agent-approvals';
+    appendMessages([
+      {
+        channelId: 'agent-approvals',
+        author: selectedPersona.name,
+        role: selectedPersona.role,
+        avatar: selectedPersona.avatar,
+        body: '@CodeOnion drop the Pro Monthly price to $15 for launch',
+        kind: 'normal'
+      },
+      {
+        channelId: 'agent-approvals',
+        author: 'Code Onion Agent',
+        role: 'Coding agent',
+        avatar: 'CO',
+        body:
+          'Working in Fast Tax... changed src/prices/prices.json: pro_monthly priceCents 2900 -> 1500. Opened draft PR #42: Launch promo pricing.',
+        kind: 'agent',
+        tags: ['Fast Tax', 'draft PR #42']
+      },
+      {
+        channelId: 'agent-approvals',
+        author: 'Code Onion Agent',
+        role: 'Policy engine',
+        avatar: 'CO',
+        body:
+          'Authority report: layer money.pricing from src/prices/OWNERS. Required before merge: @finance approval, @product approval, pricing_contract_tests, checkout_integration_tests. 1Password capability merge.money.pricing is withheld.',
+        kind: 'report',
+        tags: ['money.pricing', 'credential withheld']
+      }
+    ]);
+  }
+
+  function approvePricing(group: 'product' | 'finance') {
+    pricingDemo = {
+      ...pricingDemo,
+      productApproved: group === 'product' ? true : pricingDemo.productApproved,
+      financeApproved: group === 'finance' ? true : pricingDemo.financeApproved,
+      releaseError: ''
+    };
+
+    appendMessages([
+      {
+        channelId: 'agent-approvals',
+        author: group === 'product' ? 'Maya Chen' : 'Owen Rao',
+        role: group === 'product' ? '@product' : '@finance',
+        avatar: group === 'product' ? 'MC' : 'OR',
+        body:
+          group === 'product'
+            ? 'Approved the launch promo from product. Keep it isolated in the pricing PR.'
+            : 'Approved the $15 promo from finance for the launch window.',
+        kind: 'approval',
+        tags: [group === 'product' ? '@product approved' : '@finance approved']
+      }
+    ]);
+  }
+
+  function passPricingChecks() {
+    pricingDemo = { ...pricingDemo, checksPassed: true, releaseError: '' };
+    appendMessages([
+      {
+        channelId: 'agent-approvals',
+        author: 'Code Onion Agent',
+        role: 'CI runner',
+        avatar: 'CO',
+        body:
+          'pricing_contract_tests and checkout_integration_tests passed for PR #42. Pricing policy is now satisfied.',
+        kind: 'agent',
+        tags: ['checks passed']
+      }
+    ]);
+  }
+
+  async function releasePricingCredential() {
+    pricingDemo = { ...pricingDemo, releasePending: true, releaseError: '' };
+
+    try {
+      const response = await fetch('/api/capability/release', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ capability: 'merge.money.pricing' })
+      });
+      const receipt = await response.json();
+
+      if (!response.ok) {
+        throw new Error(receipt.message || '1Password refused the capability release.');
+      }
+
+      pricingDemo = { ...pricingDemo, releasePending: false, released: true };
+      appendMessages([
+        {
+          channelId: 'agent-approvals',
+          author: 'Code Onion Agent',
+          role: '1Password capability gate',
+          avatar: 'CO',
+          body: `1Password released ${receipt.capability} for one subprocess. Secret exposed to model: ${receipt.secretExposedToModel}. TTL: ${receipt.ttlSeconds}s. PR #42 can merge through the controlled command path.`,
+          kind: 'report',
+          tags: ['1Password receipt', 'credential released']
+        }
+      ]);
+    } catch (error) {
+      pricingDemo = {
+        ...pricingDemo,
+        releasePending: false,
+        releaseError: error instanceof Error ? error.message : 'Release failed.'
+      };
+    }
+  }
+
   function sendMessage() {
     const text = (composer || composerEl?.value || '').trim();
     if (!text) return;
 
-    const now = new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      minute: '2-digit'
-    }).format(new Date());
+    if (/@codeonion/i.test(text) && /price|pricing|\$15|15/.test(text.toLowerCase())) {
+      startPricingDemo();
+      composer = '';
+      if (composerEl) composerEl.value = '';
+      return;
+    }
 
     messages = [
       ...messages,
       {
-        id: Math.max(...messages.map((message) => message.id)) + 1,
+        id: nextMessageId(),
         channelId: selectedChannelId,
         author: selectedPersona.name,
         role: selectedPersona.role,
         avatar: selectedPersona.avatar,
-        time: now,
+        time: nowLabel(),
         body: text,
         kind: selectedPersona.id === 'agent' ? 'agent' : 'normal',
         tags: selectedPersona.id === 'agent' ? ['draft'] : undefined
@@ -207,6 +364,63 @@
       {/each}
     </div>
 
+    {#if pricingDemo.active}
+      <section class="demo-card" aria-label="Pricing authority workflow">
+        <div>
+          <p class="eyebrow">Live demo</p>
+          <h3>PR #42: Pro Monthly launch promo</h3>
+          <p>
+            `src/prices/prices.json` changed `pro_monthly` from 2900 to 1500 cents. The merge token
+            stays withheld until policy passes.
+          </p>
+        </div>
+
+        <div class="demo-steps">
+          <button
+            class:done={pricingDemo.productApproved}
+            type="button"
+            on:click={() => approvePricing('product')}
+            disabled={pricingDemo.productApproved}
+          >
+            <Check size={15} />
+            @product
+          </button>
+          <button
+            class:done={pricingDemo.financeApproved}
+            type="button"
+            on:click={() => approvePricing('finance')}
+            disabled={pricingDemo.financeApproved}
+          >
+            <Check size={15} />
+            @finance
+          </button>
+          <button
+            class:done={pricingDemo.checksPassed}
+            type="button"
+            on:click={passPricingChecks}
+            disabled={!pricingDemo.productApproved || !pricingDemo.financeApproved || pricingDemo.checksPassed}
+          >
+            <FileDiff size={15} />
+            tests
+          </button>
+          <button
+            class="release"
+            class:done={pricingDemo.released}
+            type="button"
+            on:click={releasePricingCredential}
+            disabled={!pricingDemo.checksPassed || pricingDemo.released || pricingDemo.releasePending}
+          >
+            <KeyRound size={15} />
+            {pricingDemo.releasePending ? 'releasing' : pricingDemo.released ? 'released' : '1Password'}
+          </button>
+        </div>
+
+        {#if pricingDemo.releaseError}
+          <p class="release-error">{pricingDemo.releaseError}</p>
+        {/if}
+      </section>
+    {/if}
+
     <form class="composer" on:submit|preventDefault={sendMessage}>
       <div class="composer-tools">
         <button type="button" aria-label="Attach file">
@@ -215,7 +429,7 @@
         <button type="button" aria-label="Mention">
           <AtSign size={17} />
         </button>
-        <button type="button" aria-label="Insert authority report">
+        <button type="button" aria-label="Run price drop demo" on:click={startPricingDemo}>
           <FileDiff size={17} />
         </button>
       </div>
@@ -223,7 +437,7 @@
         bind:this={composerEl}
         bind:value={composer}
         rows="2"
-        placeholder={`Message #${selectedChannel.name} as ${selectedPersona.name}`}
+        placeholder={`Try @CodeOnion drop the Pro Monthly price to $15`}
         on:keydown={(event) => {
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) sendMessage();
         }}
@@ -720,6 +934,86 @@
     font-size: 0.74rem;
     font-weight: 800;
     padding: 3px 8px;
+  }
+
+  .demo-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+    margin: 0 18px 14px;
+    padding: 14px;
+    border: 1px solid #d5ad51;
+    border-radius: 8px;
+    background: #fff3d0;
+    box-shadow: 0 16px 38px rgba(90, 61, 15, 0.13);
+  }
+
+  .demo-card h3 {
+    margin: 0 0 4px;
+    color: #201c13;
+    font-size: 1rem;
+    line-height: 1.15;
+  }
+
+  .demo-card p {
+    max-width: 68ch;
+    color: #5e513a;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+
+  .demo-steps {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+
+  .demo-steps button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    border: 1px solid #d0ba85;
+    border-radius: 8px;
+    background: #fffaf0;
+    color: #322a1a;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+    font-size: 0.78rem;
+    font-weight: 900;
+    padding: 0 10px;
+  }
+
+  .demo-steps button:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+
+  .demo-steps button.done {
+    border-color: #2d6b4f;
+    background: #244c3b;
+    color: #fffdf5;
+    opacity: 1;
+  }
+
+  .demo-steps button.release:not(:disabled) {
+    border-color: #a65a28;
+    background: #bb5b2a;
+    color: #fff8ed;
+  }
+
+  .release-error {
+    grid-column: 1 / -1;
+    color: #8c2f22;
+    font-weight: 800;
   }
 
   .composer {

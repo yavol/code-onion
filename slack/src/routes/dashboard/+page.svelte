@@ -16,6 +16,9 @@
   import { approvals, type ApprovalStatus } from '$lib/demoData';
 
   let approvalState = approvals;
+  let releasePending: Record<string, boolean> = {};
+  let releaseErrors: Record<string, string> = {};
+  let releaseReceipts: Record<string, string> = {};
 
   $: waitingCount = approvalState.filter((approval) => approval.status === 'waiting').length;
   $: blockedCount = approvalState.filter((approval) => approval.status === 'blocked').length;
@@ -33,10 +36,40 @@
     );
   }
 
-  function release(approvalId: string) {
-    approvalState = approvalState.map((approval) =>
-      approval.id === approvalId ? { ...approval, status: 'released' } : approval
-    );
+  async function release(approvalId: string) {
+    const approval = approvalState.find((item) => item.id === approvalId);
+    if (!approval || approval.capability === 'none') return;
+
+    releasePending = { ...releasePending, [approvalId]: true };
+    releaseErrors = { ...releaseErrors, [approvalId]: '' };
+
+    try {
+      const response = await fetch('/api/capability/release', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ capability: approval.capability })
+      });
+      const receipt = await response.json();
+
+      if (!response.ok) {
+        throw new Error(receipt.message || '1Password refused the capability release.');
+      }
+
+      approvalState = approvalState.map((item) =>
+        item.id === approvalId ? { ...item, status: 'released' } : item
+      );
+      releaseReceipts = {
+        ...releaseReceipts,
+        [approvalId]: `${receipt.capability} released for one subprocess, TTL ${receipt.ttlSeconds}s`
+      };
+    } catch (error) {
+      releaseErrors = {
+        ...releaseErrors,
+        [approvalId]: error instanceof Error ? error.message : 'Release failed.'
+      };
+    } finally {
+      releasePending = { ...releasePending, [approvalId]: false };
+    }
   }
 
   function block(approvalId: string) {
@@ -181,7 +214,7 @@
             {:else if approval.status === 'approved'}
               <button class="receipt" type="button" on:click={() => release(approval.id)}>
                 <KeyRound size={15} />
-                Release token
+                {releasePending[approval.id] ? 'Releasing' : 'Release token'}
               </button>
             {:else if approval.status === 'released'}
               <button class="receipt" type="button">
@@ -195,6 +228,14 @@
               </button>
             {/if}
           </div>
+
+          {#if releaseReceipts[approval.id]}
+            <p class="release-note">{releaseReceipts[approval.id]}</p>
+          {/if}
+
+          {#if releaseErrors[approval.id]}
+            <p class="release-error">{releaseErrors[approval.id]}</p>
+          {/if}
         </article>
       {/each}
     </section>
@@ -443,6 +484,7 @@
   .metrics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: stretch;
     gap: 12px;
     margin-bottom: 16px;
   }
@@ -451,6 +493,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    height: 100%;
     padding: 13px;
     border: 1px solid #d2c4af;
     border-radius: 8px;
@@ -679,6 +722,28 @@
   .receipt.muted {
     background: #e5d7c4;
     color: #756654;
+  }
+
+  .release-note,
+  .release-error {
+    border-radius: 7px;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 7px 9px;
+  }
+
+  .release-note {
+    background: #dcebdc;
+    color: #28523c;
+  }
+
+  .release-error {
+    background: #f1d7cf;
+    color: #88362d;
   }
 
   .activity {
