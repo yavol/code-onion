@@ -9,34 +9,55 @@ const execFileAsync = promisify(execFile);
 type CapabilityConfig = {
   env: string;
   label: string;
-  ttlSeconds: number;
+  receiptType: 'approval_receipt' | 'action_credential';
+  ttlSeconds?: number;
 };
 
 const CAPABILITIES: Record<string, CapabilityConfig> = {
   'merge.implementation.performance': {
     env: 'CODE_ONION_LOW_RISK_GITHUB_TOKEN',
     label: 'low-risk merge credential',
+    receiptType: 'action_credential',
     ttlSeconds: 300
   },
   'merge.money.pricing': {
     env: 'CODE_ONION_PRICING_GITHUB_TOKEN',
     label: 'pricing merge credential',
+    receiptType: 'action_credential',
     ttlSeconds: 300
   },
   'merge.vendor.api_provider': {
     env: 'CODE_ONION_PROVIDER_CHANGE_GITHUB_TOKEN',
     label: 'provider-change merge credential',
+    receiptType: 'action_credential',
     ttlSeconds: 300
   },
   'run.product_quality.recommendation_eval': {
     env: 'CODE_ONION_RECS_EVAL_TOKEN',
     label: 'recommendation eval credential',
+    receiptType: 'action_credential',
     ttlSeconds: 900
   },
   'deploy.staging': {
     env: 'CODE_ONION_STAGING_DEPLOY_TOKEN',
     label: 'staging deploy credential',
+    receiptType: 'action_credential',
     ttlSeconds: 300
+  },
+  'approve.product': {
+    env: 'CODE_ONION_PRODUCT_APPROVAL_RECEIPT',
+    label: 'product demo approval receipt',
+    receiptType: 'approval_receipt'
+  },
+  'approve.finance': {
+    env: 'CODE_ONION_FINANCE_APPROVAL_RECEIPT',
+    label: 'finance demo approval receipt',
+    receiptType: 'approval_receipt'
+  },
+  'approve.qa_override': {
+    env: 'CODE_ONION_QA_OVERRIDE_RECEIPT',
+    label: 'QA override demo approval receipt',
+    receiptType: 'approval_receipt'
   }
 };
 
@@ -79,7 +100,8 @@ export async function POST({ request }) {
     capability,
     label: config.label,
     releasedAt: new Date().toISOString(),
-    ttlSeconds: config.ttlSeconds,
+    receiptType: config.receiptType,
+    ...(config.ttlSeconds ? { ttlSeconds: config.ttlSeconds } : {}),
     subprocessOnly: true,
     secretExposedToModel: false,
     command: `op run --env-file=config/1password.env.example -- sh -c 'test -n "$${config.env}"'`

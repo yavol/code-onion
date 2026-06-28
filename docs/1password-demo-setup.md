@@ -41,8 +41,11 @@ Create these items and fields:
 | `code-onion-provider-change` | `GITHUB_TOKEN` | API provider change capability |
 | `code-onion-recs-eval` | `EVAL_TOKEN` | Recommendation offline eval capability |
 | `code-onion-staging-deploy` | `DEPLOY_TOKEN` | Staging deploy capability |
+| `code-onion-product-approval` | `APPROVAL_RECEIPT` | Demo product approval receipt |
+| `code-onion-finance-approval` | `APPROVAL_RECEIPT` | Demo finance approval receipt |
+| `code-onion-qa-override` | `APPROVAL_RECEIPT` | Demo QA override approval receipt |
 
-For a first local demo, these can be dummy tokens except the low-risk merge token if you want a real GitHub merge. Later, replace dummy values with fine-grained GitHub tokens or deploy tokens.
+For a first local demo, these can be dummy tokens except the low-risk merge token if you want a real GitHub merge. Approval receipt items are deliberately theatrical in the personal-account demo: stakeholder identity is simulated in the Slack UI, while 1Password proves that approval receipts and merge credentials are only available through the controlled subprocess path.
 
 ## Enable CLI access
 
@@ -94,6 +97,18 @@ Pricing merge:
 op run --env-file=config/1password.env.example -- sh -c 'GITHUB_TOKEN="$CODE_ONION_PRICING_GITHUB_TOKEN" gh pr merge "$PR_NUMBER" --squash --delete-branch'
 ```
 
+Product approval receipt:
+
+```bash
+op run --env-file=config/1password.env.example -- sh -c 'test -n "$CODE_ONION_PRODUCT_APPROVAL_RECEIPT"'
+```
+
+Finance approval receipt:
+
+```bash
+op run --env-file=config/1password.env.example -- sh -c 'test -n "$CODE_ONION_FINANCE_APPROVAL_RECEIPT"'
+```
+
 Recommendation eval:
 
 ```bash
@@ -105,7 +120,7 @@ The demo UI should show `released`, `withheld`, or `blocked`. It should never sh
 ## Demo rule of thumb
 
 - Safe implementation performance change: release low-risk merge credential after tests.
-- Product price change: withhold pricing merge credential until `@finance` and `@product` approve.
+- Product price change: record demo approval receipts for `@finance` and `@product`, then withhold pricing merge credential until tests pass.
 - API provider switch: withhold provider credential until `@platform` and `@security` approve.
 - ANN threshold change: release eval credential, then require metric gates before merge.
 - Deleted or weakened integration test: block by default; no normal merge credential is released.

@@ -70,6 +70,27 @@
           "count": 1
         }
       ]
+    },
+    "approve.product": {
+      "description": "Record a demo product approval receipt before product authority is marked approved.",
+      "env": "CODE_ONION_PRODUCT_APPROVAL_RECEIPT",
+      "secretReference": "op://Code Onion Demo/code-onion-product-approval/APPROVAL_RECEIPT",
+      "receiptType": "demo_approval_receipt",
+      "simulatedStakeholder": "@product"
+    },
+    "approve.finance": {
+      "description": "Record a demo finance approval receipt before finance authority is marked approved.",
+      "env": "CODE_ONION_FINANCE_APPROVAL_RECEIPT",
+      "secretReference": "op://Code Onion Demo/code-onion-finance-approval/APPROVAL_RECEIPT",
+      "receiptType": "demo_approval_receipt",
+      "simulatedStakeholder": "@finance"
+    },
+    "approve.qa_override": {
+      "description": "Record a demo QA override receipt for protected test-oracle override theater.",
+      "env": "CODE_ONION_QA_OVERRIDE_RECEIPT",
+      "secretReference": "op://Code Onion Demo/code-onion-qa-override/APPROVAL_RECEIPT",
+      "receiptType": "demo_approval_receipt",
+      "simulatedStakeholder": "@qa"
     }
   },
   "blockedLayers": {

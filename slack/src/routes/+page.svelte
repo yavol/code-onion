@@ -33,10 +33,13 @@
   let pricingDemo = {
     active: false,
     productApproved: false,
+    productPending: false,
     financeApproved: false,
+    financePending: false,
     checksPassed: false,
     released: false,
     releasePending: false,
+    approvalError: '',
     releaseError: ''
   };
 
@@ -107,10 +110,13 @@
     pricingDemo = {
       active: true,
       productApproved: false,
+      productPending: false,
       financeApproved: false,
+      financePending: false,
       checksPassed: false,
       released: false,
       releasePending: false,
+      approvalError: '',
       releaseError: ''
     };
 
@@ -144,7 +150,7 @@
         role: 'Policy engine',
         avatar: 'CO',
         body:
-          'Authority report: layer money.pricing from src/prices/OWNERS. Required before merge: @finance approval, @product approval, pricing_contract_tests, checkout_integration_tests. 1Password capability merge.money.pricing is withheld.',
+          'Authority report: layer money.pricing from src/prices/OWNERS. Required before merge: demo approval receipts for @finance and @product, pricing_contract_tests, checkout_integration_tests. The merge credential merge.money.pricing is withheld.',
         kind: 'report',
         tags: ['money.pricing', 'credential withheld']
       }
@@ -153,28 +159,75 @@
     );
   }
 
-  function approvePricing(group: 'product' | 'finance') {
+  async function releaseCapability(capability: string) {
+    const response = await fetch('/api/capability/release', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ capability })
+    });
+    const receipt = await response.json();
+
+    if (!response.ok) {
+      throw new Error(receipt.message || `1Password refused ${capability}.`);
+    }
+
+    return receipt;
+  }
+
+  async function approvePricing(group: 'product' | 'finance') {
+    const capability = group === 'product' ? 'approve.product' : 'approve.finance';
+    const isProduct = group === 'product';
+
     pricingDemo = {
       ...pricingDemo,
-      productApproved: group === 'product' ? true : pricingDemo.productApproved,
-      financeApproved: group === 'finance' ? true : pricingDemo.financeApproved,
+      productPending: isProduct ? true : pricingDemo.productPending,
+      financePending: !isProduct ? true : pricingDemo.financePending,
+      approvalError: '',
       releaseError: ''
     };
 
-    appendMessages([
-      {
-        channelId: 'agent-approvals',
-        author: group === 'product' ? 'Maya Chen' : 'Owen Rao',
-        role: group === 'product' ? '@product' : '@finance',
-        avatar: group === 'product' ? 'MC' : 'OR',
-        body:
-          group === 'product'
+    try {
+      const receipt = await releaseCapability(capability);
+
+      pricingDemo = {
+        ...pricingDemo,
+        productApproved: isProduct ? true : pricingDemo.productApproved,
+        productPending: isProduct ? false : pricingDemo.productPending,
+        financeApproved: !isProduct ? true : pricingDemo.financeApproved,
+        financePending: !isProduct ? false : pricingDemo.financePending,
+        approvalError: ''
+      };
+
+      appendMessages([
+        {
+          channelId: 'agent-approvals',
+          author: 'Code Onion Agent',
+          role: '1Password approval receipt gate',
+          avatar: 'CO',
+          body: `1Password approval receipt recorded for ${isProduct ? '@product' : '@finance'}. Secret exposed to model: ${receipt.secretExposedToModel}. Receipt type: ${receipt.receiptType}.`,
+          kind: 'report',
+          tags: ['demo approval receipt', capability]
+        },
+        {
+          channelId: 'agent-approvals',
+          author: isProduct ? 'Maya Chen' : 'Owen Rao',
+          role: isProduct ? '@product' : '@finance',
+          avatar: isProduct ? 'MC' : 'OR',
+          body: isProduct
             ? 'Approved the launch promo from product. Keep it isolated in the pricing PR.'
             : 'Approved the $15 promo from finance for the launch window.',
-        kind: 'approval',
-        tags: [group === 'product' ? '@product approved' : '@finance approved']
-      }
-    ]);
+          kind: 'approval',
+          tags: [isProduct ? '@product approved' : '@finance approved']
+        }
+      ]);
+    } catch (error) {
+      pricingDemo = {
+        ...pricingDemo,
+        productPending: isProduct ? false : pricingDemo.productPending,
+        financePending: !isProduct ? false : pricingDemo.financePending,
+        approvalError: error instanceof Error ? error.message : 'Approval receipt failed.'
+      };
+    }
   }
 
   async function passPricingChecks() {
@@ -202,16 +255,7 @@
     pricingDemo = { ...pricingDemo, releasePending: true, releaseError: '' };
 
     try {
-      const response = await fetch('/api/capability/release', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ capability: 'merge.money.pricing' })
-      });
-      const receipt = await response.json();
-
-      if (!response.ok) {
-        throw new Error(receipt.message || '1Password refused the capability release.');
-      }
+      const receipt = await releaseCapability('merge.money.pricing');
 
       pricingDemo = { ...pricingDemo, releasePending: false, released: true };
       await appendScriptedMessages(
@@ -222,9 +266,9 @@
             author: 'Code Onion Agent',
             role: '1Password capability gate',
             avatar: 'CO',
-            body: `1Password released ${receipt.capability} for one subprocess. Secret exposed to model: ${receipt.secretExposedToModel}. TTL: ${receipt.ttlSeconds}s. PR #42 can merge through the controlled command path.`,
+            body: `1Password released merge credential ${receipt.capability} for one subprocess. Secret exposed to model: ${receipt.secretExposedToModel}. TTL: ${receipt.ttlSeconds}s. PR #42 can merge through the controlled command path.`,
             kind: 'report',
-            tags: ['1Password receipt', 'credential released']
+            tags: ['1Password receipt', 'merge credential released']
           }
         ],
         'Code Onion is asking 1Password for merge.money.pricing...'
@@ -444,8 +488,13 @@
           <p class="eyebrow">Live demo</p>
           <h3>PR #42: Pro Monthly launch promo</h3>
           <p>
-            `src/prices/prices.json` changed `pro_monthly` from 2900 to 1500 cents. The merge token
-            stays withheld until policy passes.
+            `src/prices/prices.json` changed `pro_monthly` from 2900 to 1500 cents. Demo approval
+            receipts are recorded before stakeholder approval; the merge credential stays withheld
+            until policy passes.
+          </p>
+          <p class="demo-note">
+            Hackathon mode: stakeholder identity is simulated in the UI; approval receipts and merge
+            credentials are backed by 1Password.
           </p>
         </div>
 
@@ -454,19 +503,19 @@
             class:done={pricingDemo.productApproved}
             type="button"
             on:click={() => approvePricing('product')}
-            disabled={pricingDemo.productApproved}
+            disabled={pricingDemo.productApproved || pricingDemo.productPending}
           >
             <Check size={15} />
-            @product
+            {pricingDemo.productPending ? 'recording' : '@product'}
           </button>
           <button
             class:done={pricingDemo.financeApproved}
             type="button"
             on:click={() => approvePricing('finance')}
-            disabled={pricingDemo.financeApproved}
+            disabled={pricingDemo.financeApproved || pricingDemo.financePending}
           >
             <Check size={15} />
-            @finance
+            {pricingDemo.financePending ? 'recording' : '@finance'}
           </button>
           <button
             class:done={pricingDemo.checksPassed}
@@ -485,9 +534,17 @@
             disabled={!pricingDemo.checksPassed || pricingDemo.released || pricingDemo.releasePending}
           >
             <KeyRound size={15} />
-            {pricingDemo.releasePending ? 'releasing' : pricingDemo.released ? 'released' : '1Password'}
+            {pricingDemo.releasePending
+              ? 'releasing'
+              : pricingDemo.released
+                ? 'released'
+                : 'Merge credential'}
           </button>
         </div>
+
+        {#if pricingDemo.approvalError}
+          <p class="release-error">{pricingDemo.approvalError}</p>
+        {/if}
 
         {#if pricingDemo.releaseError}
           <p class="release-error">{pricingDemo.releaseError}</p>
@@ -1125,6 +1182,13 @@
       sans-serif;
     font-size: 0.88rem;
     line-height: 1.35;
+  }
+
+  .demo-card .demo-note {
+    margin-top: 8px;
+    color: #7d5a25;
+    font-size: 0.78rem;
+    font-weight: 800;
   }
 
   .demo-steps {

@@ -39,5 +39,8 @@ op run --env-file="$ENV_FILE" -- sh -c '
   test -n "${CODE_ONION_PROVIDER_CHANGE_GITHUB_TOKEN:-}"
   test -n "${CODE_ONION_RECS_EVAL_TOKEN:-}"
   test -n "${CODE_ONION_STAGING_DEPLOY_TOKEN:-}"
+  test -n "${CODE_ONION_PRODUCT_APPROVAL_RECEIPT:-}"
+  test -n "${CODE_ONION_FINANCE_APPROVAL_RECEIPT:-}"
+  test -n "${CODE_ONION_QA_OVERRIDE_RECEIPT:-}"
   echo "All configured demo capability secrets resolved."
 '
