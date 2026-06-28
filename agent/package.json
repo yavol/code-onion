@@ -1,0 +1,18 @@
+{
+  "name": "code-onion-daytona-agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fast-tax:sandbox": "tsx src/run-fast-tax-sandbox.ts",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@daytona/sdk": "^0.192.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
