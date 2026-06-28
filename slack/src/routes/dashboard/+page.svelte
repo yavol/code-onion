@@ -311,6 +311,12 @@
       serif;
   }
 
+  :global(html),
+  :global(body) {
+    height: 100%;
+    overflow: hidden;
+  }
+
   :global(button) {
     cursor: pointer;
     font: inherit;
@@ -319,16 +325,21 @@
   .dashboard {
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr) 340px;
-    min-height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .rail {
     display: flex;
     flex-direction: column;
     gap: 22px;
+    min-height: 0;
     padding: 18px;
     background: #19241d;
     color: #edf2e9;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .back-link,
@@ -377,7 +388,13 @@
 
   .content {
     min-width: 0;
+    min-height: 0;
     padding: 28px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
   }
 
   .hero,
@@ -751,9 +768,14 @@
     grid-template-rows: auto 1fr auto;
     gap: 14px;
     min-width: 0;
+    min-height: 0;
     padding: 22px;
     border-left: 1px solid #d1c1aa;
     background: #e7ddcc;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .activity-header {
@@ -763,7 +785,9 @@
 
   .timeline {
     display: grid;
+    align-content: start;
     gap: 13px;
+    min-height: 0;
   }
 
   .timeline article {
@@ -813,6 +837,8 @@
   @media (max-width: 880px) {
     .dashboard {
       grid-template-columns: 1fr;
+      height: 100dvh;
+      min-height: 0;
     }
 
     .rail {
