@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import {
     AtSign,
     Bell,
@@ -24,7 +25,11 @@
   let searchText = '';
   let composer = '';
   let composerEl: HTMLTextAreaElement;
+  let messagesEl: HTMLDivElement;
   let messages: Message[] = seedMessages;
+  const demoPrompt = '@CodeOnion drop the Pro Monthly price to $15 for launch';
+  let botStatus = '';
+  let demoRunId = 0;
   let pricingDemo = {
     active: false,
     productApproved: false,
@@ -53,6 +58,13 @@
     return Math.max(0, ...messages.map((message) => message.id)) + 1;
   }
 
+  async function scrollMessagesToBottom() {
+    await tick();
+    if (messagesEl) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+
   function appendMessages(newMessages: Omit<Message, 'id' | 'time'>[]) {
     let nextId = nextMessageId();
     const time = nowLabel();
@@ -64,9 +76,34 @@
         time
       }))
     ];
+    void scrollMessagesToBottom();
   }
 
-  function startPricingDemo() {
+  function delay(minMs = 1800, maxMs = 2600) {
+    const duration = Math.round(minMs + Math.random() * (maxMs - minMs));
+    return new Promise((resolve) => setTimeout(resolve, duration));
+  }
+
+  async function appendScriptedMessages(
+    runId: number,
+    newMessages: Omit<Message, 'id' | 'time'>[],
+    status = 'Code Onion is working...'
+  ) {
+    for (const message of newMessages) {
+      if (runId !== demoRunId) return;
+      botStatus = status;
+      await scrollMessagesToBottom();
+      await delay();
+      if (runId !== demoRunId) return;
+      botStatus = '';
+      appendMessages([message]);
+      await delay(1200, 1900);
+    }
+  }
+
+  async function startPricingDemo() {
+    const runId = ++demoRunId;
+    botStatus = '';
     pricingDemo = {
       active: true,
       productApproved: false,
@@ -84,9 +121,13 @@
         author: selectedPersona.name,
         role: selectedPersona.role,
         avatar: selectedPersona.avatar,
-        body: '@CodeOnion drop the Pro Monthly price to $15 for launch',
+        body: demoPrompt,
         kind: 'normal'
-      },
+      }
+    ]);
+    await appendScriptedMessages(
+      runId,
+      [
       {
         channelId: 'agent-approvals',
         author: 'Code Onion Agent',
@@ -107,7 +148,9 @@
         kind: 'report',
         tags: ['money.pricing', 'credential withheld']
       }
-    ]);
+      ],
+      'Code Onion is editing Fast Tax...'
+    );
   }
 
   function approvePricing(group: 'product' | 'finance') {
@@ -134,20 +177,25 @@
     ]);
   }
 
-  function passPricingChecks() {
+  async function passPricingChecks() {
+    const runId = demoRunId;
     pricingDemo = { ...pricingDemo, checksPassed: true, releaseError: '' };
-    appendMessages([
-      {
-        channelId: 'agent-approvals',
-        author: 'Code Onion Agent',
-        role: 'CI runner',
-        avatar: 'CO',
-        body:
-          'pricing_contract_tests and checkout_integration_tests passed for PR #42. Pricing policy is now satisfied.',
-        kind: 'agent',
-        tags: ['checks passed']
-      }
-    ]);
+    await appendScriptedMessages(
+      runId,
+      [
+        {
+          channelId: 'agent-approvals',
+          author: 'Code Onion Agent',
+          role: 'CI runner',
+          avatar: 'CO',
+          body:
+            'pricing_contract_tests and checkout_integration_tests passed for PR #42. Pricing policy is now satisfied.',
+          kind: 'agent',
+          tags: ['checks passed']
+        }
+      ],
+      'Code Onion is running pricing checks...'
+    );
   }
 
   async function releasePricingCredential() {
@@ -166,17 +214,21 @@
       }
 
       pricingDemo = { ...pricingDemo, releasePending: false, released: true };
-      appendMessages([
-        {
-          channelId: 'agent-approvals',
-          author: 'Code Onion Agent',
-          role: '1Password capability gate',
-          avatar: 'CO',
-          body: `1Password released ${receipt.capability} for one subprocess. Secret exposed to model: ${receipt.secretExposedToModel}. TTL: ${receipt.ttlSeconds}s. PR #42 can merge through the controlled command path.`,
-          kind: 'report',
-          tags: ['1Password receipt', 'credential released']
-        }
-      ]);
+      await appendScriptedMessages(
+        demoRunId,
+        [
+          {
+            channelId: 'agent-approvals',
+            author: 'Code Onion Agent',
+            role: '1Password capability gate',
+            avatar: 'CO',
+            body: `1Password released ${receipt.capability} for one subprocess. Secret exposed to model: ${receipt.secretExposedToModel}. TTL: ${receipt.ttlSeconds}s. PR #42 can merge through the controlled command path.`,
+            kind: 'report',
+            tags: ['1Password receipt', 'credential released']
+          }
+        ],
+        'Code Onion is asking 1Password for merge.money.pricing...'
+      );
     } catch (error) {
       pricingDemo = {
         ...pricingDemo,
@@ -324,13 +376,17 @@
         <button class="icon-button" aria-label="Notifications">
           <Bell size={18} />
         </button>
+        <button class="demo-launch" type="button" on:click={startPricingDemo}>
+          <FileDiff size={16} />
+          Run price demo
+        </button>
         <button class="icon-button" aria-label="More actions">
           <MoreHorizontal size={18} />
         </button>
       </div>
     </header>
 
-    <div class="messages" aria-live="polite">
+    <div class="messages" bind:this={messagesEl} aria-live="polite">
       {#each channelMessages as message}
         <article class:agent={message.kind === 'agent'} class:report={message.kind === 'report'} class="message">
           <span class="avatar" style={`--avatar:${message.avatar === 'CO' ? '#244c3b' : '#6b5441'}`}>
@@ -362,6 +418,24 @@
           </div>
         </article>
       {/each}
+
+      {#if botStatus}
+        <article class="message agent typing-row">
+          <span class="avatar" style="--avatar:#244c3b">CO</span>
+          <div class="message-body">
+            <div class="message-meta">
+              <strong>Code Onion Agent</strong>
+              <span>working</span>
+            </div>
+            <p>{botStatus}</p>
+            <div class="typing-dots" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </article>
+      {/if}
     </div>
 
     {#if pricingDemo.active}
@@ -422,6 +496,10 @@
     {/if}
 
     <form class="composer" on:submit|preventDefault={sendMessage}>
+      <button class="quick-demo" type="button" on:click={startPricingDemo}>
+        <FileDiff size={16} />
+        Run price-drop demo
+      </button>
       <div class="composer-tools">
         <button type="button" aria-label="Attach file">
           <Paperclip size={17} />
@@ -437,13 +515,17 @@
         bind:this={composerEl}
         bind:value={composer}
         rows="2"
-        placeholder={`Try @CodeOnion drop the Pro Monthly price to $15`}
+        placeholder={`Try ${demoPrompt}`}
         on:keydown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) sendMessage();
+          if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+          }
         }}
       ></textarea>
-      <button class="send-button" type="button" aria-label="Send message" on:click={sendMessage}>
+      <button class="send-button" type="submit" aria-label="Send message">
         <Send size={18} />
+        Send
       </button>
     </form>
   </section>
@@ -467,6 +549,12 @@
       serif;
   }
 
+  :global(html),
+  :global(body) {
+    height: 100%;
+    overflow: hidden;
+  }
+
   :global(button),
   :global(input),
   :global(textarea),
@@ -481,8 +569,8 @@
   .shell {
     display: grid;
     grid-template-columns: 72px 292px minmax(0, 1fr);
-    height: 100vh;
-    min-height: 720px;
+    height: 100dvh;
+    min-height: 0;
     overflow: hidden;
   }
 
@@ -494,6 +582,8 @@
     padding: 18px 12px;
     background: #19241d;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .workspace,
@@ -540,10 +630,13 @@
     flex-direction: column;
     gap: 20px;
     min-width: 0;
+    min-height: 0;
     padding: 18px 14px;
     background: #233329;
     color: #edf2e9;
     border-right: 1px solid #17251d;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .team-block,
@@ -731,9 +824,12 @@
 
   .conversation {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    height: 100dvh;
+    min-height: 0;
     min-width: 0;
     background: rgba(255, 253, 247, 0.9);
+    overflow: hidden;
   }
 
   .topbar {
@@ -742,6 +838,7 @@
     padding: 17px 22px 14px;
     border-bottom: 1px solid #ddd4c3;
     background: rgba(255, 253, 247, 0.96);
+    min-width: 0;
   }
 
   .channel-heading {
@@ -769,9 +866,13 @@
   .top-actions {
     gap: 9px;
     flex-shrink: 0;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .dashboard-link,
+  .demo-launch,
   .persona-picker {
     display: flex;
     align-items: center;
@@ -795,8 +896,17 @@
     white-space: nowrap;
   }
 
+  .demo-launch {
+    border: 1px solid #b45f2d;
+    padding: 0 12px;
+    background: #bb5b2a;
+    color: #fff8ed;
+    white-space: nowrap;
+  }
+
   .persona-picker {
-    min-width: 258px;
+    min-width: 210px;
+    max-width: 260px;
     padding: 7px 9px;
     color: #615b50;
     font-size: 0.76rem;
@@ -822,7 +932,11 @@
 
   .messages {
     min-height: 0;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
     padding: 14px 18px 22px;
   }
 
@@ -846,6 +960,14 @@
 
   .message.agent:not(.report) {
     background: rgba(36, 76, 59, 0.07);
+  }
+
+  .typing-row {
+    position: sticky;
+    bottom: 0;
+    border: 1px solid #d6c6ad;
+    background: #fff8e9;
+    box-shadow: 0 -8px 22px rgba(52, 42, 27, 0.08);
   }
 
   .avatar {
@@ -936,6 +1058,42 @@
     padding: 3px 8px;
   }
 
+  .typing-dots {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .typing-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #244c3b;
+    animation: typing-pulse 1.1s infinite ease-in-out;
+  }
+
+  .typing-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+
+  .typing-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
+  @keyframes typing-pulse {
+    0%,
+    80%,
+    100% {
+      opacity: 0.35;
+      transform: translateY(0);
+    }
+
+    40% {
+      opacity: 1;
+      transform: translateY(-3px);
+    }
+  }
+
   .demo-card {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -947,6 +1105,8 @@
     border-radius: 8px;
     background: #fff3d0;
     box-shadow: 0 16px 38px rgba(90, 61, 15, 0.13);
+    max-height: 34dvh;
+    overflow-y: auto;
   }
 
   .demo-card h3 {
@@ -1018,7 +1178,7 @@
 
   .composer {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 10px;
     align-items: end;
     margin: 0 18px 18px;
@@ -1030,21 +1190,46 @@
   }
 
   .composer-tools {
+    display: none;
     gap: 5px;
     align-self: stretch;
     padding-top: 3px;
+  }
+
+  .quick-demo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 150px;
+    min-height: 38px;
+    border: 0;
+    border-radius: 7px;
+    background: #bb5b2a;
+    color: #fff8ed;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+    font-size: 0.8rem;
+    font-weight: 900;
+    padding: 0 12px;
+    white-space: nowrap;
   }
 
   .composer-tools button,
   .send-button {
     display: inline-grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
     border: 0;
     border-radius: 7px;
     background: #eee5d4;
     color: #454238;
+  }
+
+  .composer-tools button {
+    width: 34px;
+    height: 34px;
   }
 
   .composer textarea {
@@ -1053,7 +1238,8 @@
     max-height: 110px;
     border: 0;
     outline: 0;
-    resize: vertical;
+    resize: none;
+    overflow-y: auto;
     background: transparent;
     color: #1d211e;
     font-family:
@@ -1065,8 +1251,21 @@
   }
 
   .send-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 82px;
+    height: 38px;
     background: #244c3b;
     color: #fff;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      sans-serif;
+    font-size: 0.82rem;
+    font-weight: 900;
+    padding: 0 13px;
   }
 
   @media (max-width: 900px) {
@@ -1086,19 +1285,24 @@
     .top-actions {
       width: 100%;
       flex-wrap: wrap;
+      justify-content: flex-start;
     }
 
     .persona-picker {
       min-width: min(100%, 320px);
+    }
+
+    .demo-launch {
+      display: none;
     }
   }
 
   @media (max-width: 640px) {
     .shell {
       grid-template-columns: 1fr;
-      height: auto;
-      min-height: 100vh;
-      overflow: visible;
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .workspace-rail {
@@ -1106,14 +1310,27 @@
     }
 
     .conversation {
-      min-height: 100vh;
+      height: 100dvh;
+      min-height: 0;
     }
 
     .composer {
-      position: sticky;
-      bottom: 0;
+      grid-template-columns: 1fr auto;
       margin: 0;
       border-radius: 0;
+    }
+
+    .quick-demo {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
+    .composer-tools {
+      display: none;
+    }
+
+    .composer textarea {
+      min-height: 58px;
     }
   }
 </style>
