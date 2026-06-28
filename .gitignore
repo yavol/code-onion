@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+!.env.1password.example
+.approvals/
+.code-onion/local/
+node_modules/
+.svelte-kit/
+build/
+dist/
+slack/node_modules/
+slack/.svelte-kit/
+slack/build/

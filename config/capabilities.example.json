@@ -1,0 +1,100 @@
+{
+  "capabilities": {
+    "merge.implementation.performance": {
+      "description": "Merge low-risk implementation changes after tests and benchmarks pass.",
+      "env": "CODE_ONION_LOW_RISK_GITHUB_TOKEN",
+      "secretReference": "op://Code Onion Demo/code-onion-low-risk-merge/GITHUB_TOKEN",
+      "approvals": [],
+      "tests": [
+        "unit_tests",
+        "golden_image_tests",
+        "benchmark_no_regression"
+      ]
+    },
+    "merge.money.pricing": {
+      "description": "Merge pricing changes after finance and product approval.",
+      "env": "CODE_ONION_PRICING_GITHUB_TOKEN",
+      "secretReference": "op://Code Onion Demo/code-onion-pricing-merge/GITHUB_TOKEN",
+      "approvals": [
+        {
+          "group": "@finance",
+          "count": 1
+        },
+        {
+          "group": "@product",
+          "count": 1
+        }
+      ],
+      "tests": [
+        "pricing_contract_tests",
+        "checkout_integration_tests"
+      ]
+    },
+    "merge.vendor.api_provider": {
+      "description": "Merge provider changes after platform and security approval.",
+      "env": "CODE_ONION_PROVIDER_CHANGE_GITHUB_TOKEN",
+      "secretReference": "op://Code Onion Demo/code-onion-provider-change/GITHUB_TOKEN",
+      "approvals": [
+        {
+          "group": "@platform",
+          "count": 1
+        },
+        {
+          "group": "@security",
+          "count": 1
+        }
+      ],
+      "tests": [
+        "provider_contract_tests",
+        "privacy_regression_tests"
+      ]
+    },
+    "run.product_quality.recommendation_eval": {
+      "description": "Run recommendation evals for ANN threshold and ranking tradeoff changes.",
+      "env": "CODE_ONION_RECS_EVAL_TOKEN",
+      "secretReference": "op://Code Onion Demo/code-onion-recs-eval/EVAL_TOKEN",
+      "approvals": [],
+      "metricGates": {
+        "recall_at_50": ">= baseline - 0.5%",
+        "p95_latency": "<= baseline + 5%",
+        "diversity_score": ">= baseline - 1%"
+      }
+    },
+    "deploy.staging": {
+      "description": "Deploy accepted demo changes to staging.",
+      "env": "CODE_ONION_STAGING_DEPLOY_TOKEN",
+      "secretReference": "op://Code Onion Demo/code-onion-staging-deploy/DEPLOY_TOKEN",
+      "approvals": [
+        {
+          "group": "@release",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "blockedLayers": {
+    "test_oracle.integration": {
+      "description": "Deleting tests, weakening assertions, or skipping integration tests is blocked unless explicitly overridden.",
+      "overrideApprovals": [
+        {
+          "group": "@qa",
+          "count": 1
+        },
+        {
+          "group": "@checkout",
+          "count": 1
+        }
+      ],
+      "credentialReleasedByDefault": false
+    }
+  },
+  "demoPersonas": {
+    "@finance": "Simulated approver for price and revenue authority.",
+    "@product": "Simulated approver for customer-facing product authority.",
+    "@platform": "Simulated approver for provider reliability authority.",
+    "@security": "Simulated approver for privacy and trust authority.",
+    "@qa": "Simulated approver for test-oracle authority.",
+    "@checkout": "Simulated approver for checkout domain authority.",
+    "@release": "Simulated approver for staging deploy authority."
+  }
+}
